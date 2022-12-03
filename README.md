@@ -125,6 +125,27 @@ ReadOnce[secrets=*****]
 ```
 
 
+# How to install?
+
+We use flit for the installation:
+
+Install flit:
+
+* `pip install flit==3.7.1`
+
+### Installing project for development
+
+`make install-dev` or `flit install --env --deps=develop --symlink` 
+
+### Installing for general showcase
+
+`make install` or `flit install --env --deps=develop` 
+
+### Run all tests in verbose
+
+`make test` or `pytest -svv` 
+
+
 # TODO
 
 * Prevent JSON serialization
