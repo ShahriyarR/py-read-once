@@ -20,7 +20,7 @@ class CustomPasswordEncoder(json.JSONEncoder):
 
 
 @pytest.fixture
-def get_senstive_class():
+def get_sensitive_class():
     return Password
 
 

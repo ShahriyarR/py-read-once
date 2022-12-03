@@ -43,6 +43,7 @@ class ReadOnce(metaclass=Final):
 
     def get_secret(self):
         frame = inspect.currentframe()
+        # get the outer frame or caller frame
         function_name = frame.f_back.f_code.co_name
         if function_name == "default":
             raise UnsupportedOperationException("Sensitive data can not be serialized")
