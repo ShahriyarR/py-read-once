@@ -26,6 +26,11 @@ Here’s a list of the key aspects of a read-once object:
 Imagine that you need to pass a password it to some kind of service, which is going to Login your user.
 The Login service will only require this password only once, so why not to restrict it to be read, used only Once?
 
+### Install using pip:
+
+`pip install readonce`
+
+Then just inherit from the `ReadOnce`:
 
 ```py
 from readonce import ReadOnce
@@ -173,7 +178,7 @@ ReadOnce[secrets=*****]
 ```
 
 
-# How to install?
+# How to install for development?
 
 ### Create and activate the virtualenv:
 
