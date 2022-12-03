@@ -5,7 +5,7 @@ Read-Once Object implementation in Python - Inspired by Secure by Design book.
 import inspect
 from typing import Any, Iterable, List
 
-__version__ = "0.01"
+__version__ = "1.0.0"
 
 
 class UnsupportedOperationException(Exception):

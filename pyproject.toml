@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "readonce"
 authors = [{name = "Shako Rzayev", email = "rzayev.sehriyar@gmail.com"}]
 readme = "README.md"
-license = {file = "LICENSE.md"}
+license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
 requires-python = ">=3.10"
