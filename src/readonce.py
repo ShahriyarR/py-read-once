@@ -1,5 +1,5 @@
 """
-Read Once Object implementation in Python - Inspired by Secure by Design book.
+Read-Once Object implementation in Python - Inspired by Secure by Design book.
 """
 
 import inspect
@@ -24,7 +24,14 @@ class Final(type):
 
 class ReadOnce(metaclass=Final):
     """
-    Read-once object implementation; inspired by Secure by Design book
+    Read-once object implementation:
+    * Sensitive data can be added only using add_secret
+    * Sensitive data can be read only once
+    * Sensitive class - inherited from ReadOnce can not be further subclassed
+    * Sensitive data can not be pickled
+    * Sensitive data can not be JSON serialized
+    * All properties, fields are hidden and can not be accessed directly - even from subclass
+    * The secrets can not be updated directly from outside - even from subclass
     """
 
     __secrets: List[str] = []
