@@ -114,6 +114,54 @@ Traceback (most recent call last):
 readonce.UnsupportedOperationException: Not allowed on sensitive value
 ```
 
+* You can not JSON serialize it:
+
+With default encoder:
+
+```py
+>>> import json
+
+>>> json.dumps(obj)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 231, in dumps
+    return _default_encoder.encode(obj)
+  File "/usr/lib/python3.10/json/encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/lib/python3.10/json/encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "/usr/lib/python3.10/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Password is not JSON serializable
+```
+
+With custom encoder:
+
+```py
+class CustomPasswordEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return {"password": obj.get_secret()}
+        except AttributeError:
+            return super().default(obj)
+```
+
+```py
+>>> json.dumps(obj, cls=CustomPasswordEncoder)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "/usr/lib/python3.10/json/encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/lib/python3.10/json/encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "<stdin>", line 4, in default
+  File "/home/shako/REPOS/py-read-once/.venv/lib/python3.10/site-packages/readonce.py", line 48, in get_secret
+    raise UnsupportedOperationException("Sensitive data can not be serialized")
+readonce.UnsupportedOperationException: ('Not allowed on sensitive value', 'Sensitive data can not be serialized')
+```
+
 * At some points the class itself can be silently dumped to logs, but not here:
 
 ```py
@@ -127,9 +175,15 @@ ReadOnce[secrets=*****]
 
 # How to install?
 
-We use flit for the installation:
+### Create and activate the virtualenv:
 
-Install flit:
+* `python3.10 -m venv .venv`
+
+* `source .venv/bin/activate`
+
+We use flit for the package management:
+
+### Install flit:
 
 * `pip install flit==3.7.1`
 
@@ -145,7 +199,3 @@ Install flit:
 
 `make test` or `pytest -svv` 
 
-
-# TODO
-
-* Prevent JSON serialization
