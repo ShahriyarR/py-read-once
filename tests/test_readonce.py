@@ -1,3 +1,4 @@
+import json
 import pickle
 
 import pytest
@@ -70,3 +71,14 @@ def test_if_several_secrets_can_be_added(get_sensitive_obj):
 def test_if_class_str_and_repr_exposes_secrets(get_sensitive_obj):
     assert get_sensitive_obj.__str__() == "ReadOnce[secrets=*****]"
     assert get_sensitive_obj.__repr__() == "ReadOnce[secrets=*****]"
+
+
+def test_if_sensitive_object_is_serializable(get_sensitive_obj, get_custom_encoder):
+
+    # With custom encoder
+    with pytest.raises(UnsupportedOperationException):
+        json.dumps(get_sensitive_obj, cls=get_custom_encoder)
+
+    # Without custom encoder
+    with pytest.raises(TypeError):
+        json.dumps(get_sensitive_obj)

@@ -23,7 +23,7 @@ class Final(type):
 
 
 class ReadOnce(metaclass=Final):
-    """ReadOnce
+    """
     Read-once object implementation; inspired by Secure by Design book
     """
 
@@ -42,6 +42,10 @@ class ReadOnce(metaclass=Final):
         self.__secrets.append(*args)
 
     def get_secret(self):
+        frame = inspect.currentframe()
+        function_name = frame.f_back.f_code.co_name
+        if function_name == "default":
+            raise UnsupportedOperationException("Sensitive data can not be serialized")
         if self.__secrets:
             return self.__secrets.pop()
         raise UnsupportedOperationException("Sensitive data was already consumed")

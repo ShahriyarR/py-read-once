@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from readonce import ReadOnce
@@ -9,9 +11,22 @@ class Password(ReadOnce):
         self.add_secret(password)
 
 
+class CustomPasswordEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return {"password": obj.get_secret()}
+        except AttributeError:
+            return super().default(obj)
+
+
 @pytest.fixture
 def get_senstive_class():
     return Password
+
+
+@pytest.fixture
+def get_custom_encoder():
+    return CustomPasswordEncoder
 
 
 @pytest.fixture(scope="function")
