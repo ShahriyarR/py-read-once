@@ -177,6 +177,137 @@ ReadOnce[secrets=*****]
 ReadOnce[secrets=*****]
 ```
 
+# How about Python Dataclasses?
+
+Regarding dataclasses, it is prohibited to directly define field then add it to secret:
+
+```py
+from readonce import ReadOnce
+from dataclasses import dataclass
+
+@dataclass
+class DBPassword(ReadOnce):
+    password: str
+    def __post_init__(self):
+        # This is going to fail with "AttributeError: 'DBPassword' object has no attribute 'password'"
+        self.add_secret(self.password)
+```
+
+The result will be:
+
+```py
+DBPassword(password="awesome")
+...
+AttributeError: 'DBPassword' object has no attribute 'password'
+```
+
+The better way either to use fields as a "descriptor" way. 
+Imagine you have an idea to share your database credentials in whole chunk. 
+We can create separate sensitive data holders or secrets for each information:
+
+```py
+from readonce import ReadOnce
+
+class Password(ReadOnce):
+    def __init__(self, password: str) -> None:
+        super().__init__()
+        self.add_secret(password)
+
+
+class DBUri(ReadOnce):
+    def __init__(self, uri: str) -> None:
+        super().__init__()
+        self.add_secret(uri)
+
+
+class DBPort(ReadOnce):
+    def __init__(self, port: int) -> None:
+        super().__init__()
+        self.add_secret(port)
+
+
+class DBHost(ReadOnce):
+    def __init__(self, host: str) -> None:
+        super().__init__()
+        self.add_secret(host)
+```
+
+Then we can combine them in one dataclass:
+
+```py
+@dataclass
+class DBCredentialsWithDescriptors:
+    password: Password = Password("db-password")
+    uri: DBUri = DBUri("mysql://")
+    port: DBPort = DBPort(3306)
+    host: DBHost = DBHost("localhost")
+```
+
+In this way, further we can get our secrets back, again using `get_secret()` and only once:
+
+```py
+>>> credentials = DBCredentialsWithDescriptors()
+>>> credentials.password.get_secret()
+'db-password'
+
+>>> credentials.password.get_secret()
+...
+readonce.UnsupportedOperationException: ('Not allowed on sensitive value', 'Sensitive data was already consumed')
+```
+
+Printing or dumping credentials object will not give any valuable information as well:
+
+```py
+>>> print(credentials)
+DBCredentialsWithDescriptors(password=ReadOnce[secrets=*****], uri=ReadOnce[secrets=*****], port=ReadOnce[secrets=*****], host=ReadOnce[secrets=*****])
+```
+
+Okay, this not a full "descriptors" in terms of Python(no `__get__` and `__set__`), but I did not open this door intentionally.
+
+
+* Another way of using dataclasses is just declaring the fields:
+
+```py
+@dataclass
+class DBCredentials:
+    password: Password
+    uri: DBUri
+    port: DBPort
+    host: DBHost
+```
+
+Then initialize the fields in the future. This approach is similar to DTOs(data transfer objects).
+
+* Is it possible to JSON serialize `DBCredentials`? Impossible if you decided to dump sensitive fields:
+Trying with custom encoder:
+```py
+import json
+
+class CustomDBCredentialsEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            # Intentionally omit other fields
+            return {"uri": obj.uri.get_secret()}
+        except AttributeError:
+            return super().default(obj)
+```
+
+```py
+>>> credentials = DBCredentialsWithDescriptors()
+
+>>> json.dumps(credentials, cls=CustomDBCredentialsEncoder)
+...
+readonce.UnsupportedOperationException: ('Not allowed on sensitive value', 'Sensitive data can not be serialized')
+```
+
+Same applies to pickling:
+
+```py
+>>> import pickle
+>>> pickle.dumps(credentials)
+...
+readonce.UnsupportedOperationException: Not allowed on sensitive value
+```
 
 # How to install for development?
 
