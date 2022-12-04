@@ -177,7 +177,7 @@ ReadOnce[secrets=*****]
 ReadOnce[secrets=*****]
 ```
 
-# How about Python Dataclasses?
+# How about Python [Dataclasses](https://docs.python.org/3.10/library/dataclasses.html)?
 
 Regarding dataclasses, it is prohibited to directly define field then add it to secret:
 
@@ -309,6 +309,88 @@ Same applies to pickling:
 readonce.UnsupportedOperationException: Not allowed on sensitive value
 ```
 
+# Relation with [Pydantic](https://pydantic-docs.helpmanual.io/)
+
+As we know the Pydantic models is a de-facto standard for data validation based on type annotations, we can easily use ReadOnce objects with Pydantic.
+In this section I am going to share some tests.
+
+The simplest way to declare Pydantic models with ReadOnce objects is to allow arbitrary types:
+
+```py
+from pydantic import BaseModel
+
+class DBCredentialsModel(BaseModel):
+    comment: str
+    password: Password
+    uri: DBUri
+    port: DBPort
+    host: DBHost
+
+    class Config:
+        arbitrary_types_allowed = True
+```
+
+Creating credentials:
+
+```py
+>>> credentials = DBCredentialsModel(comment="The Hacked Database", password=Password("db-password"), uri=DBUri("mysql://"), port=DBPort(3306), host=DBHost("localhost"))
+>>> credentials
+DBCredentialsModel(comment='The Hacked Database', password=ReadOnce[secrets=*****], uri=ReadOnce[secrets=*****], port=ReadOnce[secrets=*****], host=ReadOnce[secrets=*****])
+```
+
+Again the sensitive data is not exposed:
+
+```py
+credentials.dict()
+{'comment': 'The Hacked Database', 'password': ReadOnce[secrets=*****], 'uri': ReadOnce[secrets=*****], 'port': ReadOnce[secrets=*****], 'host': ReadOnce[secrets=*****]}
+```
+
+It can not be serialized in a default way:
+
+```py
+>>> credentials.json()
+...
+TypeError: Object of type 'Password' is not JSON serializable
+```
+
+Unfortunately, the nature of the ReadOnce object prevents using powerful validation mechanics in the model class.
+In its core, the sensitive object can not be used twice if it was already consumed:
+* You can call arbitrary time `add_secret()` if no `get_secret()` was called before it.
+* Whenever you called `get_secret()` the sensitive object is considered as exhausted.
+
+Imagine we want to validate the password length and try to add custom validator inside the Pydantic model:
+
+```py
+from pydantic import BaseModel, validator
+
+class InvalidDBCredentialsModel(BaseModel):
+    comment: str
+    password: Password
+    uri: DBUri
+    port: DBPort
+    host: DBHost
+
+    @validator("password")
+    def password_length_check(cls, v):
+        passwd = v.get_secret()
+        if len(passwd) > 7:
+            v.add_secret(passwd)
+            return v
+        raise ValueError("Password length should be more than 7")
+
+    class Config:
+        arbitrary_types_allowed = True
+```
+
+As you can expect, we need first get the secret data then validate it, if validation is okay we need to put that secret back to the sensitive object, which is not possible.
+
+Therefore, it is better to push the validation logic towards `Password` sensitive class instead. We will explore the validation in-depth in the future.
+
+If we test this `InvalidDBCredentialsModel` it should fail with:
+`readonce.UnsupportedOperationException: ('Not allowed on sensitive value', 'Sensitive object exhausted; you can not use it twice')`
+
+> If you have any further Pydantic ideas please open an issue, we can explore and figure out the best usage
+
 # How to install for development?
 
 ### Create and activate the virtualenv:
@@ -335,3 +417,7 @@ We use flit for the package management:
 
 `make test` or `pytest -svv` 
 
+
+# TODO
+
+* Design by Contract ideas for ReadOnce object validation
