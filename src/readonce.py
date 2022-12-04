@@ -35,16 +35,26 @@ class ReadOnce(metaclass=Final):
     """
 
     __secrets: List[str] = []
+    __is_consumed: bool = False
 
     @classmethod
     def __init__(cls) -> None:
         cls.__secrets = []
+        cls.__is_consumed = False
 
     @classmethod
     def __reset_secrets(cls) -> None:
         cls.__secrets = []
 
+    @classmethod
+    def __update_is_consumed(cls):
+        cls.__is_consumed = True
+
     def add_secret(self, *args):
+        if self.__is_consumed:
+            raise UnsupportedOperationException(
+                "Sensitive object exhausted; you can not use it twice"
+            )
         self.__reset_secrets()
         self.__secrets.append(*args)
 
@@ -55,12 +65,17 @@ class ReadOnce(metaclass=Final):
         if function_name == "default":
             raise UnsupportedOperationException("Sensitive data can not be serialized")
         if self.__secrets:
+            self.__update_is_consumed()
             return self.__secrets.pop()
         raise UnsupportedOperationException("Sensitive data was already consumed")
 
     @property
     def secrets(self):
         return []
+
+    @property
+    def is_consumed(self):
+        return None
 
     def __getattribute__(self, __name: str) -> Any:
         frame = inspect.currentframe()
@@ -73,6 +88,22 @@ class ReadOnce(metaclass=Final):
         ):
             return []
 
+        if __name == "_ReadOnce__is_consumed" and function_name not in (
+            "add_secret",
+            "get_secret",
+        ):
+            return None
+
+        if __name == "_ReadOnce__update_is_consumed" and function_name not in (
+            "get_secret",
+        ):
+            raise UnsupportedOperationException()
+
+        if __name == "_ReadOnce__reset_secrets" and function_name not in (
+            "add_secret",
+        ):
+            raise UnsupportedOperationException()
+
         return super().__getattribute__(__name)
 
     def __setattr__(self, __name: str, __value: str) -> Any:
@@ -84,6 +115,9 @@ class ReadOnce(metaclass=Final):
             "add_secret",
             "__init__",
         ):
+            raise UnsupportedOperationException()
+
+        if __name == "_ReadOnce__is_consumed" and function_name not in ("get_secret",):
             raise UnsupportedOperationException()
 
     def __dir__(self) -> Iterable[str]:

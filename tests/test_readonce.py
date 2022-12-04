@@ -32,12 +32,28 @@ def test_direct_secrets_access_is_empty_list(get_password_obj):
     assert get_password_obj.secrets == []
 
 
+def test_direct_access_to_is_consumed_field(get_password_obj):
+    assert get_password_obj.is_consumed is None
+    assert get_password_obj._ReadOnce__is_consumed is None
+
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__is_consumed = True
+
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__update_is_consumed()
+
+
+def test_direct_reset_secrets_call(get_password_obj):
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__reset_secrets()
+
+
 def test_sensitive_class_dict_is_empty(get_password_obj):
     assert get_password_obj.__dict__ == {}
 
 
 def test_sensitive_class_dir_output_is_empty(get_password_obj):
-    assert dir(get_password_obj) == []
+    assert not dir(get_password_obj)
     assert get_password_obj.__dir__() == []
 
 
@@ -63,6 +79,14 @@ def test_if_several_secrets_can_be_added(get_password_obj):
     assert len(get_password_obj) == 1
 
     assert get_password_obj.get_secret() == "new_secret2"
+
+
+def test_if_sensitive_object_can_be_used_after_consuming(get_password_obj):
+    get_password_obj.get_secret()
+    # It should fail to add new secret after consuming old one. Why?
+    # Imagine you can read password then add back to secret then read it again???
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj.add_secret("new_secret")
 
 
 def test_if_class_str_and_repr_exposes_secrets(get_password_obj):
@@ -143,3 +167,37 @@ def test_use_sensitive_data_class(
     # Again can not be read twice
     with pytest.raises(UnsupportedOperationException):
         credentials.password.get_secret()
+
+
+def test_use_sensitive_data_pydantic_model(
+    get_db_credentials_model,
+    get_password_class,
+    get_db_host_class,
+    get_db_uri_class,
+    get_db_port,
+):
+    credentials = get_db_credentials_model(
+        comment="The Hacked Database",
+        password=get_password_class("db-password"),
+        uri=get_db_uri_class("mysql://"),
+        host=get_db_host_class("localhost"),
+        port=get_db_port(3306),
+    )
+    assert credentials.password.get_secret() == "db-password"
+
+
+def test_use_invalid_sensitive_data_pydantic_model(
+    get_invalid_db_credentials_model,
+    get_password_class,
+    get_db_host_class,
+    get_db_uri_class,
+    get_db_port,
+):
+    with pytest.raises(UnsupportedOperationException):
+        get_invalid_db_credentials_model(
+            comment="The Hacked Database",
+            password=get_password_class("db-password"),  # valid length password
+            uri=get_db_uri_class("mysql://"),
+            host=get_db_host_class("localhost"),
+            port=get_db_port(3306),
+        )

@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 
 import pytest
+from pydantic import BaseModel, validator
 
 from readonce import ReadOnce
 
@@ -72,6 +73,36 @@ class DBCredentials:
     host: DBHost
 
 
+class InvalidDBCredentialsModel(BaseModel):
+    comment: str
+    password: Password
+    uri: DBUri
+    port: DBPort
+    host: DBHost
+
+    @validator("password")
+    def password_length_check(cls, v):
+        passwd = v.get_secret()
+        if len(passwd) > 7:
+            v.add_secret(passwd)
+            return v
+        raise ValueError("Password length should be more than 7")
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class DBCredentialsModel(BaseModel):
+    comment: str
+    password: Password
+    uri: DBUri
+    port: DBPort
+    host: DBHost
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 @pytest.fixture
 def get_password_class():
     return Password
@@ -120,3 +151,13 @@ def get_db_host_class():
 @pytest.fixture
 def get_db_port():
     return DBPort
+
+
+@pytest.fixture
+def get_db_credentials_model():
+    return DBCredentialsModel
+
+
+@pytest.fixture
+def get_invalid_db_credentials_model():
+    return InvalidDBCredentialsModel
