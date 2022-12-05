@@ -10,7 +10,9 @@ license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "icontract >=2.6.2",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -22,7 +24,6 @@ dev = [
     "pre-commit >=2.17.0",
     "pytype >=2022.1.31",
     "pydantic >=1.10.2",
-    "icontract >=2.6.2",
     ]
 test = [
     "pytest >=7.1.3",
