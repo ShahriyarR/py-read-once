@@ -20,11 +20,11 @@ def validate_password_length(password: str) -> bool:
 
 
 class Password(ReadOnce):
+    @icontract.ensure(lambda self: len(self) == 1, "Secret is missing")
     @icontract.require(
         lambda password: validate_password_length(password),
         "Password length should be more than 7",
     )
-    @icontract.ensure(lambda self: len(self) == 1, "Secret is missing")
     def __init__(self, password: str) -> None:
         super().__init__()
         self.add_secret(password)

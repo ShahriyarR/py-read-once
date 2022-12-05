@@ -116,6 +116,11 @@ class ReadOnce(metaclass=Final):
         ):
             raise UnsupportedOperationException()
 
+        if __name == "_ReadOnce__reset_is_consumed" and function_name not in (
+            "__init__",
+        ):
+            raise UnsupportedOperationException()
+
         return super().__getattribute__(__name)
 
     def __setattr__(self, __name: str, __value: str) -> Any:
