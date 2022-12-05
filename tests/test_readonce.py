@@ -43,6 +43,11 @@ def test_direct_access_to_is_consumed_field(get_password_obj):
         get_password_obj._ReadOnce__update_is_consumed()
 
 
+def test_direct__reset_is_consumed_call(get_password_obj):
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__reset_is_consumed()
+
+
 def test_direct_reset_secrets_call(get_password_obj):
     with pytest.raises(UnsupportedOperationException):
         get_password_obj._ReadOnce__reset_secrets()

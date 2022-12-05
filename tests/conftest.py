@@ -1,13 +1,30 @@
 import json
+import re
 from dataclasses import dataclass
 
+import icontract
 import pytest
 from pydantic import BaseModel, validator
 
 from readonce import ReadOnce
 
 
+def validate_password(password: str) -> bool:
+    reg = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!#%*?&]{6,20}$"
+    pattern = re.compile(reg)
+    return bool(re.search(pattern, password))
+
+
+def validate_password_length(password: str) -> bool:
+    return len(password) > 7
+
+
 class Password(ReadOnce):
+    @icontract.ensure(lambda self: len(self) == 1, "Secret is missing")
+    @icontract.require(
+        lambda password: validate_password_length(password),
+        "Password length should be more than 7",
+    )
     def __init__(self, password: str) -> None:
         super().__init__()
         self.add_secret(password)

@@ -5,7 +5,9 @@ Read-Once Object implementation in Python - Inspired by Secure by Design book.
 import inspect
 from typing import Any, Iterable, List
 
-__version__ = "1.0.1"
+import icontract
+
+__version__ = "1.0.2"
 
 
 class UnsupportedOperationException(Exception):
@@ -22,6 +24,10 @@ class Final(type):
         return type.__new__(cls, name, bases, dict(classdict))
 
 
+@icontract.invariant(
+    lambda self: len(self) == 0 or len(self) == 1,
+    "There can be no or only single secret data stored",
+)
 class ReadOnce(metaclass=Final):
     """
     Read-once object implementation:
@@ -37,14 +43,18 @@ class ReadOnce(metaclass=Final):
     __secrets: List[str] = []
     __is_consumed: bool = False
 
-    @classmethod
-    def __init__(cls) -> None:
-        cls.__secrets = []
-        cls.__is_consumed = False
+    @icontract.ensure(lambda self: not self.__secrets and not self.__is_consumed)
+    def __init__(self) -> None:
+        self.__reset_secrets()
+        self.__reset_is_consumed()
 
     @classmethod
     def __reset_secrets(cls) -> None:
         cls.__secrets = []
+
+    @classmethod
+    def __reset_is_consumed(cls):
+        cls.__is_consumed = False
 
     @classmethod
     def __update_is_consumed(cls):
@@ -60,8 +70,8 @@ class ReadOnce(metaclass=Final):
 
     def get_secret(self):
         frame = inspect.currentframe()
-        # get the outer frame or caller frame
-        function_name = frame.f_back.f_code.co_name
+        # get two upper/back frame; one is getting back from icontract wrapper, second to get encoder default function
+        function_name = frame.f_back.f_back.f_code.co_name
         if function_name == "default":
             raise UnsupportedOperationException("Sensitive data can not be serialized")
         if self.__secrets:
@@ -91,6 +101,7 @@ class ReadOnce(metaclass=Final):
         if __name == "_ReadOnce__is_consumed" and function_name not in (
             "add_secret",
             "get_secret",
+            "__init__",
         ):
             return None
 
@@ -101,6 +112,12 @@ class ReadOnce(metaclass=Final):
 
         if __name == "_ReadOnce__reset_secrets" and function_name not in (
             "add_secret",
+            "__init__",
+        ):
+            raise UnsupportedOperationException()
+
+        if __name == "_ReadOnce__reset_is_consumed" and function_name not in (
+            "__init__",
         ):
             raise UnsupportedOperationException()
 
@@ -117,7 +134,10 @@ class ReadOnce(metaclass=Final):
         ):
             raise UnsupportedOperationException()
 
-        if __name == "_ReadOnce__is_consumed" and function_name not in ("get_secret",):
+        if __name == "_ReadOnce__is_consumed" and function_name not in (
+            "get_secret",
+            "__init__",
+        ):
             raise UnsupportedOperationException()
 
     def __dir__(self) -> Iterable[str]:

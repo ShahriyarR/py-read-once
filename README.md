@@ -391,6 +391,80 @@ If we test this `InvalidDBCredentialsModel` it should fail with:
 
 > If you have any further Pydantic ideas please open an issue, we can explore and figure out the best usage
 
+# Applying best practices from Design by Contract
+
+In order to further ensure data(secret) integrity and security, 
+we can use `DbC` ideas as it gives us cleaner way of defining reusable constraints.
+
+I like [icontract](https://github.com/Parquery/icontract) package which is quite handy tool.
+I have tried to explain this YouTube tutorial as well [Design-by-Contract programming with Python](https://www.youtube.com/watch?v=yi-GInnc768).
+
+Let's redefine our sensitive class as:
+
+```py
+import icontract
+from readonce import ReadOnce
+
+def validate_password_length(password: str) -> bool:
+    return len(password) > 7
+
+class Password(ReadOnce):
+    @icontract.ensure(lambda self: len(self) == 1, "Secret is missing")
+    @icontract.require(
+        lambda password: validate_password_length(password),
+        "Password length should be more than 7",
+    )
+    def __init__(self, password: str) -> None:
+        super().__init__()
+        self.add_secret(password)
+```
+
+The current password validation is quite naive, it just checks the length of the string: this is our `pre-condition` and
+it is marked as `@icontract.require`.
+
+But what is `@icontract.ensure` then? 
+This is our so called, `post-condition`: after adding secret the length of the secrets storage must be equal to one.
+
+We can add more sophisticated password validation using regex, it is up to your business needs.
+The question should be asked here: *"What is a password for our application?"*
+
+```py
+import re
+
+def validate_password(password: str) -> bool:
+    reg = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!#%*?&]{6,20}$"
+    pattern = re.compile(reg)
+    return bool(re.search(pattern, password))
+```
+
+After writing down password requirements you can convert them to `pre-conditions` as part of your DbC approach.
+
+* I used these ideas in the `ReadOnce` implementation as well, such as:
+
+```py
+@icontract.ensure(lambda self: not self.__secrets and not self.__is_consumed)
+def __init__(self) -> None:
+    self.__reset_secrets()
+    self.__reset_is_consumed()
+```
+
+Here I make myself to be sure that everything was reset properly.
+
+Another important topic is the invariants. Thinking about `ReadOnce` object, 
+at its lifecycle there can be either zero secret or only and only one secret:
+
+```py
+@icontract.invariant(
+    lambda self: len(self) == 0 or len(self) == 1,
+    "There can be no or only single secret data stored",
+)
+class ReadOnce(metaclass=Final):
+    ...
+```
+
+If somebody tries to inject more than one data to the secret storage, it will fail as it is a clear invariant violation.
+
+
 # How to install for development?
 
 ### Create and activate the virtualenv:
