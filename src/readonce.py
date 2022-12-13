@@ -43,7 +43,7 @@ class ReadOnce(metaclass=Final):
     __secrets: List[str] = []
     __is_consumed: bool = False
 
-    @icontract.ensure(lambda self: not self.__secrets and not self.__is_consumed)
+    @icontract.ensure(lambda self: self.__is_reset())
     def __init__(self) -> None:
         self.__reset_secrets()
         self.__reset_is_consumed()
@@ -59,6 +59,10 @@ class ReadOnce(metaclass=Final):
     @classmethod
     def __update_is_consumed(cls):
         cls.__is_consumed = True
+
+    @classmethod
+    def __is_reset(cls):
+        return len(cls.__secrets) == 0 and cls.__is_consumed is False
 
     def add_secret(self, *args):
         if self.__is_consumed:
