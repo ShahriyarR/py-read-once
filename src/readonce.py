@@ -62,7 +62,7 @@ class ReadOnce(metaclass=Final):
 
     @classmethod
     def __is_reset(cls):
-        return len(cls.__secrets) == 0 and cls.__is_consumed is False
+        return not cls.secrets and not cls.__is_consumed
 
     def add_secret(self, *args):
         if self.__is_consumed:
