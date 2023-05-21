@@ -206,3 +206,46 @@ def test_use_invalid_sensitive_data_pydantic_model(
             host=get_db_host_class("localhost"),
             port=get_db_port(3306),
         )
+
+
+def test_monkeypatch_get_secret(get_password_obj, monkeypatch):
+    def mock_return():
+        return "12345"
+
+    get_password_obj.add_secret("new_secret")
+    monkeypatch.setattr(get_password_obj, "get_secret", mock_return)
+    # the original secret was not affected
+    assert get_password_obj.get_secret() != mock_return()
+
+
+def test_monkeypatch_add_secret(get_password_obj, monkeypatch):
+    def mock_return():
+        return "12345"
+
+    # basically has no effect on add_secret
+    monkeypatch.setattr(get_password_obj, "add_secret", mock_return)
+    get_password_obj.add_secret("fake")
+    monkeypatch.setattr(get_password_obj, "get_secret", mock_return)
+    # the original secret was not affected
+    assert get_password_obj.get_secret() != mock_return()
+
+
+def test_monkeypatch_change_secrets_property(get_password_obj, monkeypatch):
+    # It has no effect either for the secrets property
+    monkeypatch.setattr(get_password_obj, "secrets", ["12345"])
+    # Still original secret is there
+    assert get_password_obj.get_secret() != "12345"
+
+
+def test_monkeypatch_change_secrets_storage(get_password_obj, monkeypatch):
+    # Directly trying to monkeypatch will raise double UnsupportedOperationException;
+    # As monkeypatch in its default undo() section tries to again edit "_ReadOnce__secrets" which raises same exception
+    # That's why we use context() below
+
+    # with pytest.raises(UnsupportedOperationException):
+    #     monkeypatch.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=False)
+
+    with pytest.raises(UnsupportedOperationException):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=True)
+

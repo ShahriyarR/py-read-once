@@ -439,30 +439,26 @@ def validate_password(password: str) -> bool:
 
 After writing down password requirements you can convert them to `pre-conditions` as part of your DbC approach.
 
-* I used these ideas in the `ReadOnce` implementation as well, such as:
+# Is it possible to monkeypatch the secret logic management?
+
+As far, as I have tested it, 
+it is really non-trivial and over-hardened to monkeypatch the secret storage and also the secret management methods.
+
+For eg, following test clearly shows the consequences:
 
 ```py
-@icontract.ensure(lambda self: not self.__secrets and not self.__is_consumed)
-def __init__(self) -> None:
-    self.__reset_secrets()
-    self.__reset_is_consumed()
+def test_monkeypatch_change_secrets_storage(get_password_obj, monkeypatch):
+    # Directly trying to monkeypatch will raise double UnsupportedOperationException;
+    # As monkeypatch in its default undo() section tries to again edit "_ReadOnce__secrets" which raises same exception
+    # That's why we use context() below
+
+    # with pytest.raises(UnsupportedOperationException):
+    #     monkeypatch.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=False)
+
+    with pytest.raises(UnsupportedOperationException):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=True)
 ```
-
-Here I make myself to be sure that everything was reset properly.
-
-Another important topic is the invariants. Thinking about `ReadOnce` object, 
-at its lifecycle there can be either zero secret or only and only one secret:
-
-```py
-@icontract.invariant(
-    lambda self: len(self) == 0 or len(self) == 1,
-    "There can be no or only single secret data stored",
-)
-class ReadOnce(metaclass=Final):
-    ...
-```
-
-If somebody tries to inject more than one data to the secret storage, it will fail as it is a clear invariant violation.
 
 
 # How to install for development?
@@ -489,9 +485,5 @@ We use flit for the package management:
 
 ### Run all tests in verbose
 
-`make test` or `pytest -svv` 
+`make test` or `pytest -svv`
 
-
-# TODO
-
-* Design by Contract ideas for ReadOnce object validation
