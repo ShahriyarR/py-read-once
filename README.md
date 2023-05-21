@@ -26,6 +26,30 @@ Here’s a list of the key aspects of a read-once object:
 Imagine that you need to pass a password it to some kind of service, which is going to Login your user.
 The Login service will only require this password only once, so why not to restrict it to be read, used only Once?
 
+# Important information
+
+The ReadOnce object is not a cryptography library. 
+It is not responsible for encrypting/decrypting or dictating any type of cryptography methods to store and retrieve your secrets.
+
+The main idea behind the ReadOnce objects is hardening the access and allow only one time access to the stored secrets in the object.
+
+Question: Are the secrets stored in plain text?
+Answer: No, we use symmetric encryption from cryptography named [Fernet](https://cryptography.io/en/latest/fernet/).
+And we store passed secret data internally as so called fernet token(ciphertext+hash value).
+When you try to retrieve the secret back, it is decrypted with the same key and send back as a plain text.
+
+Question: Then we have an encryption+hashing of plaintext?
+Answer: Yes, but ReadOnce class expects already encrypted(+ peppered, salted, hashed etc.) string to be passed as a secret, 
+because when you retrieve the secret it will return what it was originally passed. 
+If you passed the secret as "12345" you will get back "12345".
+If you passed the secret something like "HmDVbz6N3MlXqZ4q3TvLakMQ9fQjI45yhuoRHyZWiM4=" you will get back the same string.
+
+Question: Then why you store the secret as a token(ciphertext+hash value)?
+Answer: It is an extra layer of hardening, if somehow, somebody could get the ReadOnce object and tries to steal the secret, lovely attacker should also have the key.
+Okay the key also stored in ReadOnce object, but it is a non-trivial to get the key back. 
+If the attacker tries to add new secret over old one, the encryption key also updated.
+
+
 ### Install using pip:
 
 `pip install readonce`
