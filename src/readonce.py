@@ -3,11 +3,12 @@ Read-Once Object implementation in Python - Inspired by Secure by Design book.
 """
 
 import inspect
-from typing import Any, Iterable, List
+from typing import Any, Iterable, List, Optional
 
 import icontract
+from cryptography.fernet import Fernet
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 
 class UnsupportedOperationException(Exception):
@@ -40,13 +41,17 @@ class ReadOnce(metaclass=Final):
     * The secrets can not be updated directly from outside - even from subclass
     """
 
-    __secrets: List[str] = []
+    __secrets: List[bytes] = []
     __is_consumed: bool = False
+    __key: Optional[bytes] = None
 
-    @icontract.ensure(lambda self: not self.__secrets and not self.__is_consumed)
+    @icontract.ensure(
+        lambda self: not self.__secrets and not self.__is_consumed and not self.__key
+    )
     def __init__(self) -> None:
         self.__reset_secrets()
         self.__reset_is_consumed()
+        self.__reset_key()
 
     @classmethod
     def __reset_secrets(cls) -> None:
@@ -57,16 +62,37 @@ class ReadOnce(metaclass=Final):
         cls.__is_consumed = False
 
     @classmethod
+    def __reset_key(cls):
+        cls.__key = None
+
+    @classmethod
     def __update_is_consumed(cls):
         cls.__is_consumed = True
 
-    def add_secret(self, *args):
+    @classmethod
+    def __update_key(cls, key: bytes):
+        cls.__key = key
+
+    def add_secret(self, secret: Any):
+        def __get_token():
+            key_ = Fernet.generate_key()
+            fernet = Fernet(key_)
+            return key_, fernet.encrypt(bytes(secret_, encoding="utf-8"))
+
         if self.__is_consumed:
             raise UnsupportedOperationException(
                 "Sensitive object exhausted; you can not use it twice"
             )
+        secret_ = str(secret)
         self.__reset_secrets()
-        self.__secrets.append(*args)
+        self.__reset_key()
+        key, token = __get_token()
+        self.__update_key(key)
+        if not self.__key:
+            raise UnsupportedOperationException(
+                "Missing encryption key; impossible to store the secret"
+            )
+        self.__secrets.append(token)
 
     def get_secret(self):
         frame = inspect.currentframe()
@@ -76,7 +102,15 @@ class ReadOnce(metaclass=Final):
             raise UnsupportedOperationException("Sensitive data can not be serialized")
         if self.__secrets:
             self.__update_is_consumed()
-            return self.__secrets.pop()
+            if not self.__key:
+                raise UnsupportedOperationException(
+                    "Missing encryption key; impossible decrypt the secret"
+                )
+            fernet = Fernet(self.__key)
+            token = self.__secrets.pop()
+            secret = fernet.decrypt(token)
+            self.__reset_key()
+            return secret.decode(encoding="utf-8")
         raise UnsupportedOperationException("Sensitive data was already consumed")
 
     @property
@@ -85,6 +119,10 @@ class ReadOnce(metaclass=Final):
 
     @property
     def is_consumed(self):
+        return None
+
+    @property
+    def key(self):
         return None
 
     def __getattribute__(self, __name: str) -> Any:
@@ -99,6 +137,13 @@ class ReadOnce(metaclass=Final):
             return []
 
         if __name == "_ReadOnce__is_consumed" and function_name not in (
+            "add_secret",
+            "get_secret",
+            "__init__",
+        ):
+            return None
+
+        if __name == "_ReadOnce__key" and function_name not in (
             "add_secret",
             "get_secret",
             "__init__",
@@ -121,6 +166,16 @@ class ReadOnce(metaclass=Final):
         ):
             raise UnsupportedOperationException()
 
+        if __name == "_ReadOnce__reset_key" and function_name not in (
+            "get_secret",
+            "add_secret",
+            "__init__",
+        ):
+            raise UnsupportedOperationException()
+
+        if __name == "_ReadOnce__update_key" and function_name not in ("add_secret",):
+            raise UnsupportedOperationException()
+
         return super().__getattribute__(__name)
 
     def __setattr__(self, __name: str, __value: str) -> Any:
@@ -136,6 +191,13 @@ class ReadOnce(metaclass=Final):
 
         if __name == "_ReadOnce__is_consumed" and function_name not in (
             "get_secret",
+            "__init__",
+        ):
+            raise UnsupportedOperationException()
+
+        if __name == "_ReadOnce__key" and function_name not in (
+            "get_secret",
+            "add_secret",
             "__init__",
         ):
             raise UnsupportedOperationException()
