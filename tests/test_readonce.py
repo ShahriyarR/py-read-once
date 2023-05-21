@@ -248,4 +248,3 @@ def test_monkeypatch_change_secrets_storage(get_password_obj, monkeypatch):
     with pytest.raises(UnsupportedOperationException):
         with monkeypatch.context() as m:
             m.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=True)
-
