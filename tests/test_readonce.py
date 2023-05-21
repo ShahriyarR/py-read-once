@@ -119,7 +119,8 @@ def test_if_dataclass_field_can_be_used(get_db_password_class):
 
 def test_use_sensitive_class_as_descriptor(get_db_credentials_with_desc_obj):
     db_port = get_db_credentials_with_desc_obj.port
-    assert db_port.get_secret() == 3306
+    # Integers are converted to strings
+    assert db_port.get_secret() == "3306"
     db_uri = get_db_credentials_with_desc_obj.uri
     assert db_uri.get_secret() == "mysql://"
 
@@ -248,3 +249,25 @@ def test_monkeypatch_change_secrets_storage(get_password_obj, monkeypatch):
     with pytest.raises(UnsupportedOperationException):
         with monkeypatch.context() as m:
             m.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=True)
+
+
+def test_direct_access_to_key_field(get_password_obj):
+    assert get_password_obj.key is None
+    assert get_password_obj._ReadOnce__key is None
+
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__key = b"new key"
+
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__update_key(b"new key")
+
+    with pytest.raises(UnsupportedOperationException):
+        get_password_obj._ReadOnce__reset_key()
+
+
+def test_monkeypatch_the_key(get_password_obj, monkeypatch):
+    get_password_obj.add_secret("new_secret")
+
+    with pytest.raises(UnsupportedOperationException):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "_ReadOnce__key", None)
