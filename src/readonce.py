@@ -8,7 +8,7 @@ from typing import Any, Iterable, List, Optional
 import icontract
 from cryptography.fernet import Fernet
 
-__version__ = "1.0.3"
+__version__ = "1.1.3"
 
 
 class UnsupportedOperationException(Exception):
@@ -30,88 +30,13 @@ class Final(type):
     "There can be no or only single secret data stored",
 )
 class ReadOnce(metaclass=Final):
-    """
-    Read-once object implementation:
-    * Sensitive data can be added only using add_secret
-    * Sensitive data can be read only once
-    * Sensitive class - inherited from ReadOnce can not be further subclassed
-    * Sensitive data can not be pickled
-    * Sensitive data can not be JSON serialized
-    * All properties, fields are hidden and can not be accessed directly - even from subclass
-    * The secrets can not be updated directly from outside - even from subclass
-    """
-
-    __secrets: List[bytes] = []
-    __is_consumed: bool = False
-    __key: Optional[bytes] = None
-
     @icontract.ensure(
-        lambda self: not self.__secrets and not self.__is_consumed and not self.__key
+        lambda self: not self.secrets_ and not self.is_consumed_ and not self.key_
     )
     def __init__(self) -> None:
-        self.__reset_secrets()
-        self.__reset_is_consumed()
-        self.__reset_key()
-
-    @classmethod
-    def __reset_secrets(cls) -> None:
-        cls.__secrets = []
-
-    @classmethod
-    def __reset_is_consumed(cls):
-        cls.__is_consumed = False
-
-    @classmethod
-    def __reset_key(cls):
-        cls.__key = None
-
-    @classmethod
-    def __update_is_consumed(cls):
-        cls.__is_consumed = True
-
-    @classmethod
-    def __update_key(cls, key: bytes):
-        cls.__key = key
-
-    def add_secret(self, secret: Any):
-        def __get_token():
-            key_ = Fernet.generate_key()
-            fernet = Fernet(key_)
-            return key_, fernet.encrypt(bytes(secret_, encoding="utf-8"))
-
-        if self.__is_consumed:
-            raise UnsupportedOperationException(
-                "Sensitive object exhausted; you can not use it twice"
-            )
-        secret_ = str(secret)
-        self.__reset_secrets()
-        self.__reset_key()
-        key, token = __get_token()
-        self.__update_key(key)
-        if not self.__key:
-            raise UnsupportedOperationException(
-                "Missing encryption key; impossible to store the secret"
-            )
-        self.__secrets.append(token)
-
-    def get_secret(self):
-        frame = inspect.currentframe()
-        # get two upper/back frame; one is getting back from icontract wrapper, second to get encoder default function
-        function_name = frame.f_back.f_back.f_code.co_name
-        if function_name == "default":
-            raise UnsupportedOperationException("Sensitive data can not be serialized")
-        if self.__secrets:
-            self.__update_is_consumed()
-            if not self.__key:
-                raise UnsupportedOperationException(
-                    "Missing encryption key; impossible decrypt the secret"
-                )
-            fernet = Fernet(self.__key)
-            token = self.__secrets.pop()
-            secret = fernet.decrypt(token)
-            self.__reset_key()
-            return secret.decode(encoding="utf-8")
-        raise UnsupportedOperationException("Sensitive data was already consumed")
+        self.secrets_: List[bytes] = []
+        self.is_consumed_: bool = False
+        self.key_: Optional[bytes] = None
 
     @property
     def secrets(self):
@@ -125,82 +50,152 @@ class ReadOnce(metaclass=Final):
     def key(self):
         return None
 
-    def __getattribute__(self, __name: str) -> Any:
+    def add_secret(self, secret: Any):
+        def __get_token():
+            key_ = Fernet.generate_key()
+            fernet = Fernet(key_)
+            return key_, fernet.encrypt(bytes(secret_, encoding="utf-8"))
+
+        if self.is_consumed_:
+            raise UnsupportedOperationException(
+                "Sensitive object exhausted; you can not use it twice"
+            )
+        secret_ = str(secret)
+        self.reset_secrets()
+        self.reset_key()
+        key, token = __get_token()
+        self.update_key(key)
+        if not self.key_:
+            raise UnsupportedOperationException(
+                "Missing encryption key; impossible to store the secret"
+            )
+        self.secrets_.append(token)
+
+    def get_secret(self):
+        frame = inspect.currentframe()
+        # get two upper/back frame; one is getting back from icontract wrapper, second to get encoder default function
+        function_name = frame.f_back.f_back.f_code.co_name
+        if function_name == "default":
+            raise UnsupportedOperationException("Sensitive data can not be serialized")
+        if self.secrets_:
+            self.update_is_consumed()
+            if not self.is_consumed_:
+                raise UnsupportedOperationException("Failed to set consumed flag")
+            if not self.key_:
+                raise UnsupportedOperationException(
+                    "Missing encryption key; impossible decrypt the secret"
+                )
+            fernet = Fernet(self.key_)
+            token = self.secrets_.pop()
+            secret = fernet.decrypt(token)
+            self.reset_key()
+            return secret.decode(encoding="utf-8")
+        raise UnsupportedOperationException("Sensitive data was already consumed")
+
+    def __getattribute__(self, attr):
         frame = inspect.currentframe()
         # get the outer frame or caller frame
         function_name = frame.f_back.f_code.co_name
-        if __name == "_ReadOnce__secrets" and function_name not in (
+
+        if attr == "secrets_" and function_name not in (
             "add_secret",
             "get_secret",
+            "reset_secrets",
             "__len__",
         ):
             return []
 
-        if __name == "_ReadOnce__is_consumed" and function_name not in (
+        if attr == "reset_secrets" and function_name not in (
+            "add_secret",
+            "__init__",
+        ):
+            raise UnsupportedOperationException()
+
+        if attr == "is_consumed_" and function_name not in (
             "add_secret",
             "get_secret",
+            "reset_is_consumed",
+            "update_is_consumed",
             "__init__",
         ):
             return None
 
-        if __name == "_ReadOnce__key" and function_name not in (
+        if attr == "reset_is_consumed" and function_name not in ("__init__",):
+            raise UnsupportedOperationException()
+
+        if attr == "update_is_consumed" and function_name not in ("get_secret",):
+            raise UnsupportedOperationException()
+
+        if attr == "key_" and function_name not in (
             "add_secret",
             "get_secret",
+            "update_key",
+            "reset_key",
             "__init__",
         ):
             return None
 
-        if __name == "_ReadOnce__update_is_consumed" and function_name not in (
-            "get_secret",
-        ):
-            raise UnsupportedOperationException()
-
-        if __name == "_ReadOnce__reset_secrets" and function_name not in (
+        if attr == "reset_key" and function_name not in (
             "add_secret",
-            "__init__",
-        ):
-            raise UnsupportedOperationException()
-
-        if __name == "_ReadOnce__reset_is_consumed" and function_name not in (
-            "__init__",
-        ):
-            raise UnsupportedOperationException()
-
-        if __name == "_ReadOnce__reset_key" and function_name not in (
             "get_secret",
-            "add_secret",
             "__init__",
         ):
             raise UnsupportedOperationException()
 
-        if __name == "_ReadOnce__update_key" and function_name not in ("add_secret",):
+        if attr == "update_key" and function_name not in ("add_secret",):
             raise UnsupportedOperationException()
 
-        return super().__getattribute__(__name)
+        return super().__getattribute__(attr)
 
-    def __setattr__(self, __name: str, __value: str) -> Any:
+    def __setattr__(self, attr: str, value: str) -> Any:
         frame = inspect.currentframe()
         # get the outer frame or caller frame
         function_name = frame.f_back.f_code.co_name
-
-        if __name == "_ReadOnce__secrets" and function_name not in (
+        if attr == "secrets_" and function_name not in (
             "add_secret",
+            "reset_secrets",
             "__init__",
         ):
             raise UnsupportedOperationException()
 
-        if __name == "_ReadOnce__is_consumed" and function_name not in (
+        if attr == "is_consumed_" and function_name not in (
             "get_secret",
+            "update_is_consumed",
             "__init__",
         ):
             raise UnsupportedOperationException()
 
-        if __name == "_ReadOnce__key" and function_name not in (
+        if attr == "key_" and function_name not in (
             "get_secret",
             "add_secret",
+            "reset_key",
+            "update_key",
             "__init__",
         ):
             raise UnsupportedOperationException()
+
+        if attr == "get_secret":
+            raise UnsupportedOperationException()
+
+        if attr == "add_secret":
+            raise UnsupportedOperationException()
+
+        super().__setattr__(attr, value)
+
+    def reset_secrets(self) -> None:
+        self.secrets_ = []
+
+    def reset_is_consumed(self):
+        self.is_consumed_ = False
+
+    def update_is_consumed(self):
+        self.is_consumed_ = True
+
+    def reset_key(self):
+        self.key_ = None
+
+    def update_key(self, key: bytes):
+        self.key_ = key
 
     def __dir__(self) -> Iterable[str]:
         return []
@@ -218,4 +213,7 @@ class ReadOnce(metaclass=Final):
         raise UnsupportedOperationException()
 
     def __len__(self):
-        return len(self.__secrets)
+        return len(self.secrets_)
+
+    def __dict__(self):
+        return {}

@@ -4,6 +4,7 @@ import pickle
 import pytest
 
 from readonce import UnsupportedOperationException
+from tests.conftest import Password
 
 
 def test_finalized_class_can_not_be_subclassed(get_password_class):
@@ -30,31 +31,32 @@ def test_if_can_pickle_the_secret_class(get_password_obj):
 
 def test_direct_secrets_access_is_empty_list(get_password_obj):
     assert get_password_obj.secrets == []
+    assert get_password_obj.secrets_ == []
 
 
 def test_direct_access_to_is_consumed_field(get_password_obj):
     assert get_password_obj.is_consumed is None
-    assert get_password_obj._ReadOnce__is_consumed is None
+    assert get_password_obj.is_consumed_ is None
 
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__is_consumed = True
+        get_password_obj.is_consumed_ = True
 
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__update_is_consumed()
+        get_password_obj.update_is_consumed()
 
 
-def test_direct__reset_is_consumed_call(get_password_obj):
+def test_direct_reset_is_consumed_call(get_password_obj):
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__reset_is_consumed()
+        get_password_obj.reset_is_consumed()
 
 
 def test_direct_reset_secrets_call(get_password_obj):
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__reset_secrets()
+        get_password_obj.reset_secrets()
 
 
 def test_sensitive_class_dict_is_empty(get_password_obj):
-    assert get_password_obj.__dict__ == {}
+    assert get_password_obj.__dict__() == {}
 
 
 def test_sensitive_class_dir_output_is_empty(get_password_obj):
@@ -63,7 +65,7 @@ def test_sensitive_class_dir_output_is_empty(get_password_obj):
 
 
 def test_sensitive_class_super_class_secrets_is_empty(get_password_obj):
-    assert get_password_obj._ReadOnce__secrets == []
+    assert get_password_obj.secrets_ == []
     assert get_password_obj.secrets == []
 
 
@@ -214,7 +216,9 @@ def test_monkeypatch_get_secret(get_password_obj, monkeypatch):
         return "12345"
 
     get_password_obj.add_secret("new_secret")
-    monkeypatch.setattr(get_password_obj, "get_secret", mock_return)
+    with pytest.raises(UnsupportedOperationException):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "get_secret", mock_return)
     # the original secret was not affected
     assert get_password_obj.get_secret() != mock_return()
 
@@ -224,16 +228,23 @@ def test_monkeypatch_add_secret(get_password_obj, monkeypatch):
         return "12345"
 
     # basically has no effect on add_secret
-    monkeypatch.setattr(get_password_obj, "add_secret", mock_return)
+    with pytest.raises(UnsupportedOperationException):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "add_secret", mock_return)
     get_password_obj.add_secret("fake")
-    monkeypatch.setattr(get_password_obj, "get_secret", mock_return)
+
+    with pytest.raises(UnsupportedOperationException):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "get_secret", mock_return)
     # the original secret was not affected
     assert get_password_obj.get_secret() != mock_return()
 
 
 def test_monkeypatch_change_secrets_property(get_password_obj, monkeypatch):
     # It has no effect either for the secrets property
-    monkeypatch.setattr(get_password_obj, "secrets", ["12345"])
+    with pytest.raises(AttributeError):
+        with monkeypatch.context() as m:
+            m.setattr(get_password_obj, "secrets", ["12345"])
     # Still original secret is there
     assert get_password_obj.get_secret() != "12345"
 
@@ -248,21 +259,21 @@ def test_monkeypatch_change_secrets_storage(get_password_obj, monkeypatch):
 
     with pytest.raises(UnsupportedOperationException):
         with monkeypatch.context() as m:
-            m.setattr(get_password_obj, "_ReadOnce__secrets", ["12345"], raising=True)
+            m.setattr(get_password_obj, "secrets_", ["12345"], raising=True)
 
 
 def test_direct_access_to_key_field(get_password_obj):
     assert get_password_obj.key is None
-    assert get_password_obj._ReadOnce__key is None
+    assert get_password_obj.key_ is None
 
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__key = b"new key"
+        get_password_obj.key_ = b"new key"
 
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__update_key(b"new key")
+        get_password_obj.update_key(b"new key")
 
     with pytest.raises(UnsupportedOperationException):
-        get_password_obj._ReadOnce__reset_key()
+        get_password_obj.reset_key()
 
 
 def test_monkeypatch_the_key(get_password_obj, monkeypatch):
@@ -270,4 +281,14 @@ def test_monkeypatch_the_key(get_password_obj, monkeypatch):
 
     with pytest.raises(UnsupportedOperationException):
         with monkeypatch.context() as m:
-            m.setattr(get_password_obj, "_ReadOnce__key", None)
+            m.setattr(get_password_obj, "key_", None)
+
+
+def test_if_can_create_and_consume_same_secret_multiple_times(get_password_obj):
+    get_password_obj.add_secret("new_secret")
+    pass_1 = Password("new_secret")
+    pass_2 = Password("new_secret")
+
+    assert pass_1 is not pass_2
+    assert pass_1 != pass_2
+    assert get_password_obj.get_secret() == pass_1.get_secret() == pass_2.get_secret()
