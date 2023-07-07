@@ -313,5 +313,7 @@ def test_if_can_be_serialized_inside_the_list(get_password_obj):
             yaml.dump(data, f)
 
 
-def test_if_can_be_serialized_with_custom_loader(get_attrs_password):
-    ...
+def test_if_can_be_serialized_with_attrs(get_attrs_password):
+    # and it is impossible
+    with pytest.raises(UnsupportedOperationException):
+        yaml.dump(get_attrs_password)

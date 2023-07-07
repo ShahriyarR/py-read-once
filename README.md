@@ -191,6 +191,31 @@ Traceback (most recent call last):
 readonce.UnsupportedOperationException: ('Not allowed on sensitive value', 'Sensitive data can not be serialized')
 ```
 
+* It is impossible to YAML serialize/deserialize the ReadOnce object
+
+```python
+import yaml 
+
+from readonce import ReadOnce
+
+
+class Password(ReadOnce):
+    def __init__(self, password: str) -> None:
+        super().__init__()
+        self.add_secret(password)
+
+data_ = {"test": "data", "c": Password("awesome_new_password")}
+yaml.dump(data_)
+```
+
+The result will be:
+
+```
+raise UnsupportedOperationException()
+readonce.UnsupportedOperationException: Not allowed on sensitive value
+```
+
+
 * At some points the class itself can be silently dumped to logs, but not here:
 
 ```py
