@@ -2,9 +2,10 @@ import json
 import pickle
 
 import pytest
+import yaml
 
 from readonce import UnsupportedOperationException
-from tests.conftest import Password
+from tests.conftest import AttrsPassword, Password
 
 
 def test_finalized_class_can_not_be_subclassed(get_password_class):
@@ -292,3 +293,25 @@ def test_if_can_create_and_consume_same_secret_multiple_times(get_password_obj):
     assert pass_1 is not pass_2
     assert pass_1 != pass_2
     assert get_password_obj.get_secret() == pass_1.get_secret() == pass_2.get_secret()
+
+
+# YAML tests
+
+
+def test_if_can_be_serialized_using_yaml(get_password_obj):
+    data_ = {"test": "data", "c": get_password_obj}
+    # and it is impossible
+    with pytest.raises(UnsupportedOperationException):
+        yaml.dump(data_)
+
+
+def test_if_can_be_serialized_inside_the_list(get_password_obj):
+    data = [get_password_obj, Password("new_password")]
+    # and it is impossible
+    with pytest.raises(UnsupportedOperationException):
+        with open("users.yml", "w") as f:
+            yaml.dump(data, f)
+
+
+def test_if_can_be_serialized_with_custom_loader(get_attrs_password):
+    ...
