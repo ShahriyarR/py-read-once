@@ -5,7 +5,7 @@ import pytest
 import yaml
 
 from readonce import UnsupportedOperationException
-from tests.conftest import AttrsPassword, Password
+from tests.conftest import Password
 
 
 def test_finalized_class_can_not_be_subclassed(get_password_class):
