@@ -191,6 +191,31 @@ Traceback (most recent call last):
 readonce.UnsupportedOperationException: ('Not allowed on sensitive value', 'Sensitive data can not be serialized')
 ```
 
+* It is impossible to YAML serialize/deserialize the ReadOnce object
+
+```python
+import yaml 
+
+from readonce import ReadOnce
+
+
+class Password(ReadOnce):
+    def __init__(self, password: str) -> None:
+        super().__init__()
+        self.add_secret(password)
+
+data_ = {"test": "data", "c": Password("awesome_new_password")}
+yaml.dump(data_)
+```
+
+The result will be:
+
+```
+raise UnsupportedOperationException()
+readonce.UnsupportedOperationException: Not allowed on sensitive value
+```
+
+
 * At some points the class itself can be silently dumped to logs, but not here:
 
 ```py
@@ -200,6 +225,32 @@ ReadOnce[secrets=*****]
 >>> obj
 ReadOnce[secrets=*****]
 ```
+
+# How about Python [attrs](https://www.attrs.org/en/stable/index.html)
+
+It is possible to use the ReadOnce object as arbitrary type with attrs.
+
+The simplest case:
+
+```python
+from attrs import define, asdict
+
+@define
+class AttrsPassword:
+    data: Password
+```
+
+Then you can retrieve it as dictionary:
+
+```python
+def get_attrs_password():
+    return asdict(AttrsPassword(data=Password("awesome_password")))
+```
+
+The result of the function will be `{'data': ReadOnce[secrets=*****]}`.
+
+> We did not check it for more complex scenarios, if you spot something weird please fill the issue.
+
 
 # How about Python [Dataclasses](https://docs.python.org/3.10/library/dataclasses.html)?
 
