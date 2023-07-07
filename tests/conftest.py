@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import icontract
 import pytest
+from attrs import asdict, define
 from pydantic import BaseModel, validator
 
 from readonce import ReadOnce
@@ -28,6 +29,16 @@ class Password(ReadOnce):
     def __init__(self, password: str) -> None:
         super().__init__()
         self.add_secret(password)
+
+
+@define
+class AttrsPassword:
+    data: Password
+
+
+@pytest.fixture(scope="module")
+def get_attrs_password():
+    return asdict(AttrsPassword(data=Password("awesome_password")))
 
 
 class DBUri(ReadOnce):
