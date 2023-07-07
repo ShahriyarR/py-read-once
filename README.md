@@ -226,6 +226,32 @@ ReadOnce[secrets=*****]
 ReadOnce[secrets=*****]
 ```
 
+# How about Python [attrs](https://www.attrs.org/en/stable/index.html)
+
+It is possible to use the ReadOnce object as arbitrary type with attrs.
+
+The simplest case:
+
+```python
+from attrs import define, asdict
+
+@define
+class AttrsPassword:
+    data: Password
+```
+
+Then you can retrieve it as dictionary:
+
+```python
+def get_attrs_password():
+    return asdict(AttrsPassword(data=Password("awesome_password")))
+```
+
+The result of the function will be `{'data': ReadOnce[secrets=*****]}`.
+
+> We did not check it for more complex scenarios, if you spot something weird please fill the issue.
+
+
 # How about Python [Dataclasses](https://docs.python.org/3.10/library/dataclasses.html)?
 
 Regarding dataclasses, it is prohibited to directly define field then add it to secret:
