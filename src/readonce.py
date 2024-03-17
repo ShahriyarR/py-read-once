@@ -213,7 +213,7 @@ class ReadOnce(metaclass=Final):
         raise UnsupportedOperationException()
 
     def __len__(self):
-        return len(self.secrets_)
+        return 0
 
     def __dict__(self):
         return {}
